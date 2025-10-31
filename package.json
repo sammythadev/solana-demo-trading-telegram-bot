@@ -1,0 +1,25 @@
+{
+  "name": "Axel",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "build": "echo 'No build step required for now'"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.12.1",
+  "dependencies": {
+    "axios": "^1.10.0",
+    "dotenv": "^16.5.0",
+    "nodemon": "^3.1.10",
+    "pg": "^8.16.2",
+    "redis": "^5.8.3",
+    "sequelize": "^6.37.7",
+    "telegraf": "^4.16.3"
+  }
+}
