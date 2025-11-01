@@ -9,7 +9,9 @@ export default (bot) => {
       '/positions - view positions in clean view',
       '/balance - View SOL balance',
       '/topup <amount> - Add demo SOL',
-      '/settings - Change execution speed'
+      '/settings - Change execution speed',
+      '',
+      'Contact the developer: @realkazper — message @realkazper for more details or support.'
     ].join('\n');
     await ctx.reply(helpText);
   });

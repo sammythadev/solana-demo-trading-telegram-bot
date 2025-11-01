@@ -237,143 +237,110 @@ services:
 ---
 
 ## 🧩 Commands Reference
+## Axel — Telegram Simulated Solana Trading Bot
 
-| Command                  | Description                              |
-| ------------------------ | ---------------------------------------- |
-| `/start`                 | Register user and show initial balance.  |
-| `/token <mint>`          | Show live token info from Dexscreener.   |
-| `/buy <mint> <sol>`      | Simulate a token purchase.               |
-| `/sell <mint> <percent>` | Simulate selling part/all of a position. |
-| `/portfolio`             | Show open positions and current PnL.     |
-| `/balance`               | Display user’s SOL balance.              |
-| `/topup <amount>`        | Add demo SOL to balance.                 |
-| `/settings`              | Change execution speed mode.             |
-| `/help`                  | Show all available commands.             |
+This repository contains a Telegram bot that simulates trading on Solana-based tokens using live market data from Dexscreener. Trades are simulated using an internal virtual SOL balance — no wallets are connected and no on-chain transactions occur.
 
----
+Key features:
+- Simulated buy/sell using live token prices from Dexscreener (SOL/USD fetched live).
+- Positions and transaction history stored via Sequelize (Postgres compatible).
+- Redis caching for Dexscreener responses to reduce API calls and improve performance.
+- Execution speed modes (Turbo / Fast / Normal / Slow). Gas fees are applied internally per-mode and deducted automatically from the SOL balance.
+- Inline / interactive flows: quick-buy buttons, custom-buy capture, portfolio pagination, and compact positions view.
 
-## ⏱️ Execution Speed Modes
-
-| Mode      | Label               | Delay      | Description                     |
-| --------- | ------------------- | ---------- | ------------------------------- |
-| ⚡ Turbo   | Execute instantly   | 0ms        | No delay — instant confirmation |
-| 🚀 Fast   | Quick trades        | ~200–300ms | Slight delay for realism        |
-| ⏱️ Normal | Balanced speed      | ~500–700ms | Default realistic delay         |
-| 🐢 Slow   | Realistic DEX delay | ~1–2s      | Simulates congested network     |
+Developer contact: @realkazper (message for support)
 
 ---
 
-## 💾 Database Schema Overview
+## Quick start (Windows / PowerShell)
 
-### **Table: users**
+1. Install dependencies (this project uses pnpm in package.json but npm/yarn also work):
 
-| Column      | Type      | Description             |
-| ----------- | --------- | ----------------------- |
-| id          | SERIAL    | Primary key             |
-| telegram_id | BIGINT    | Telegram user ID        |
-| balance_sol | FLOAT     | Virtual SOL balance     |
-| speed_mode  | ENUM      | Execution speed setting |
-| created_at  | TIMESTAMP | Created date            |
+```powershell
+# install using pnpm (recommended if you use pnpm)
+pnpm install
 
-### **Table: positions**
-
-| Column        | Type      | Description            |
-| ------------- | --------- | ---------------------- |
-| id            | SERIAL    | Primary key            |
-| user_id       | INT       | Foreign key to `users` |
-| token_address | TEXT      | Token mint address     |
-| symbol        | TEXT      | Token symbol           |
-| buy_price     | FLOAT     | USD buy price          |
-| amount_tokens | FLOAT     | Amount purchased       |
-| sol_spent     | FLOAT     | SOL used               |
-| created_at    | TIMESTAMP | Created date           |
-
-### **Table: transactions**
-
-| Column        | Type      | Description               |
-| ------------- | --------- | ------------------------- |
-| id            | SERIAL    | Primary key               |
-| user_id       | INT       | Foreign key to `users`    |
-| type          | ENUM      | `buy`, `sell`, or `topup` |
-| token_address | TEXT      | Token mint                |
-| sol_amount    | FLOAT     | Amount in SOL             |
-| pnl_usd       | FLOAT     | Profit/Loss               |
-| created_at    | TIMESTAMP | Timestamp                 |
-
----
-
-## 🧾 Example Bot Flow
-
-1️⃣ `/start` → Register user
-2️⃣ `/token <mint>` → Show price + liquidity
-3️⃣ `/buy <mint> 0.3` → Simulate buying
-4️⃣ `/portfolio` → Check positions + PnL
-5️⃣ `/sell <mint> 50` → Sell half your tokens
-6️⃣ `/settings` → Change execution speed
-7️⃣ `/balance` → View updated SOL balance
-
----
-
-## 🚀 Setup Guide
-
-```bash
-# Clone repo
-git clone https://github.com/yourusername/solana-demo-trading-bot.git
-cd solana-demo-trading-bot
-
-# Install dependencies
+# or npm
 npm install
+```
 
-# Configure environment
-cp .env.example .env
-# (Edit with your Telegram bot token, DB, and Redis credentials)
+2. Create a `.env` file in the repo root (example values):
 
-# Start containers (Postgres + Redis)
+```text
+BOT_TOKEN=your_telegram_bot_token
+REDIS_URL=redis://localhost:6379
+DATABASE_URL=postgres://user:pass@localhost:5432/axel_db   # optional if you want persistence
+DEXSCREENER_BASE_URL=https://api.dexscreener.com/latest/dex/tokens
+```
+
+3. Start Redis (required). You can run Redis locally or via Docker Compose. The repository's `docker-compose.yml` currently starts the bot and Redis only; if you need Postgres locally, run it separately or extend the compose file.
+
+```powershell
+# using docker-compose (starts bot + redis as configured in the repository)
 docker-compose up -d
 
-# Start bot
-npm run dev
+# Or run redis locally (example using docker)
+docker run -d --name local-redis -p 6379:6379 redis:7
 ```
 
----
+4. Start the bot:
 
-## 🧠 Future Enhancements
+```powershell
+# development with auto-reload (nodemon)
+pnpm run dev
 
-* 🏆 Leaderboard — show top profitable users
-* 🔥 Pump.fun feed integration — trending coin tracker
-* 🧩 Inline buttons for quick actions
-* 💼 Wallet connect (real Solana integration)
-* 📊 Web dashboard for PnL visualization
-
----
-
-## 👨‍💻 Contributors
-
-* **You** — Creator & Developer
-* Dexscreener API — Market data source
-
----
-
-## 🛠 License
-
-MIT License — feel free to fork, modify, and extend.
-
----
-
-## 🌐 Links
-
-* [Dexscreener API Docs](https://docs.dexscreener.com/)
-* [Telegraf (Telegram Bot Framework)](https://telegraf.js.org/)
-* [Sequelize ORM](https://sequelize.org/)
-* [Redis](https://redis.io/)
-
----
-
-> *"Built for builders. Train your instincts before you trade for real."* 💪
-
+# or run directly
+pnpm start
 ```
 
+5. In Telegram, open your bot and use `/start` to register.
+
 ---
 
-Would you like me to include **README badges and branding** (e.g., Shields.io badges for Node.js, PostgreSQL, Redis, License, etc.) at the top to make it look like a polished GitHub repo?
-```
+## Commands (overview)
+
+- /start — Register the user and seed demo SOL balance
+- /help — Show commands and contact (developer: @realkazper)
+- /token <mint> — Lookup token details (price, liquidity, FDV, 24h)
+- /buy <mint> <sol> — Simulate a buy of the token using the given SOL amount (gas is deducted automatically per user speed mode)
+- /sell <mint|symbol> <percent> — Simulate selling a percent of a position (supports inline percent buttons)
+- /portfolio — Paginated view of open positions (5 per page)
+- /positions — Compact positions view (symbol — amount — value — PnL%)
+- /trades [all|buys|sells] — View transaction history (defaults to sold trades)
+- /balance — Show SOL balance
+- /topup <amount> — Add demo SOL to your balance
+- /settings — Select execution speed (Turbo, Fast, Normal, Slow); fees are applied automatically and not shown explicitly in the UI
+
+---
+
+## Notes and important operational details
+
+- Live pricing: SOL/USD and token prices are fetched from Dexscreener. WSOL mint is used to compute SOL price where applicable.
+- Caching: Dexscreener token responses are cached in Redis (short TTL) to reduce API load.
+- Gas/fees: Gas USD amounts per speed mode are defined internally (in `src/config/constants.js`) and converted to SOL at runtime using the live SOL/USD price. The UI does not show the fee amount — it's deducted silently from the user's SOL balance on each trade.
+- Database: The app uses Sequelize models for persistence. For production, use proper migrations — runtime `sync({ alter: true })` is not recommended for Postgres enums and was reverted due to enum-cast errors. If you need DB persistence locally, run Postgres and set `DATABASE_URL`.
+- Pending interactive state: custom-buy waiting state is stored in-memory; to survive restarts consider moving that state to Redis (recommended enhancement).
+
+---
+
+## Troubleshooting
+
+- If you see startup errors related to enum migrations (Postgres): ensure your schema matches the models or run explicit migrations rather than `sync({ alter: true })`.
+- If token fields (liquidity/FDV/24h) show `N/A`, Dexscreener returned a different shape — check logs or re-fetch; caching may be in effect.
+
+---
+
+## Development notes
+
+- Code lives under `src/` — commands in `src/bot/commands`, services in `src/services`, and DB models in `src/db/models`.
+- Add unit tests and a small integration test harness to validate `tradeService` and SOL price fetch (todo: automated tests).
+
+---
+
+If you'd like, I can:
+- Add a short automated test that runs a simulated buy and prints pre/post balance for quick verification.
+- Add Postgres to the repo `docker-compose.yml` and provide a migration script to create the necessary tables.
+- Add README badges (Node, Redis, License).
+
+---
+Developer contact: @realkazper
