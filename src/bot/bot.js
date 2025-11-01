@@ -9,6 +9,7 @@ import sellCommand from './commands/sell.js';
 import portfolioCommand from './commands/portfolio.js';
 import positionsCommand from './commands/positions.js';
 import balanceCommand from './commands/balance.js';
+import tradesCommand from './commands/trades.js';
 import topupCommand from './commands/topup.js';
 import settingsCommand from './commands/settings.js';
 import { fetchTokenData } from './utils/dexApi.js';
@@ -35,6 +36,7 @@ sellCommand(bot);
 portfolioCommand(bot);
 positionsCommand(bot);
 balanceCommand(bot);
+tradesCommand(bot);
 topupCommand(bot);
 settingsCommand(bot);
 
@@ -57,16 +59,18 @@ export default bot;
 bot.on('text', async (ctx) => {
   const text = (ctx.message && ctx.message.text) ? ctx.message.text.trim() : '';
   if (!text) return;
-  // ignore commands and messages that look like sentences
-  if (text.startsWith('/') || text.includes(' ')) return;
-  // simple Base58-ish address detection (32-44 chars, base58 charset)
-  const isAddr = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(text);
-  if (!isAddr) return;
-
-  const mint = text;
+  // ignore explicit commands
+  if (text.startsWith('/')) return;
+  // try to find a base58-like token anywhere in the message (32-44 chars)
+  const m = text.match(/[1-9A-HJ-NP-Za-km-z]{32,44}/);
+  if (!m) return;
+  const mint = m[0];
     try {
       const data = await fetchTokenData(mint);
-      if (!data) return; // silently ignore if not found
+      if (!data) {
+        // tell the user if dex data not found so they know
+        return ctx.reply('Token not found on Dexscreener for address: ' + mint);
+      }
       const parsed = parseDexData(data);
   const out = `🪙 ${parsed.name || parsed.symbol || 'Unknown'} (${parsed.symbol || '—'})\n💰 Price: $${fmtUSD(parsed.priceUsd)}\n💧 Liquidity: $${fmtUSD(parsed.liquidityUsd)}\n📊 FDV: $${fmtUSD(parsed.fdv)}mcap\n📈 24h: ${parsed.change24h !== null ? parsed.change24h + '%' : 'N/A'}\n🔗 ${parsed.url || ''}`;
 

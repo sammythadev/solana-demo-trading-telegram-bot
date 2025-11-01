@@ -74,12 +74,15 @@ export default (bot) => {
   });
 
   // Inline callback handlers for quick-sell buttons (callback_data format: sell:<mint>:<percent|custom>)
-  bot.action(/sell:.+/, async (ctx) => {
+  // Anchor the regex to avoid matching payloads like "portfolio:sell:..."
+  bot.action(/^sell:.+/, async (ctx) => {
     try {
       const data = ctx.callbackQuery && ctx.callbackQuery.data;
       if (!data) return ctx.answerCbQuery();
       await ctx.answerCbQuery();
       const parts = data.split(':');
+      // expected ['sell', '<mint>', '<amt>']
+      if (parts.length < 3) return ctx.reply('Invalid callback data.');
       const mint = parts[1];
       const amt = parts[2];
       if (!mint) return ctx.reply('Invalid mint in callback.');
@@ -87,7 +90,7 @@ export default (bot) => {
         return ctx.reply(`To sell, reply with:\n/sell ${mint} <percent>`);
       }
       const percent = parseFloat(amt);
-      if (isNaN(percent) || percent <= 0 || percent > 100) return ctx.reply('Invalid percent.');
+      if (isNaN(percent) || percent <= 0 || percent > 100) return ctx.reply('Percent must be 1-100.');
       try {
         const res = await executeSell(ctx.state.user, mint, percent);
         await ctx.reply(res);

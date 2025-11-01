@@ -18,6 +18,8 @@ export const initDB = async () => {
   Position.belongsTo(User, { foreignKey: 'user_id' });
   User.hasMany(Transaction, { foreignKey: 'user_id' });
 
+  // sync models (do not auto-alter enums/column types which can fail on Postgres)
+  // Using plain sync avoids runtime ALTERs that may error when enum types differ.
   await sequelize.sync();
   console.log('Database synced');
   return { sequelize, models: { User, Position, Transaction } };

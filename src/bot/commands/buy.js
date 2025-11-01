@@ -1,6 +1,11 @@
 import { executeBuy } from '../../services/tradeService.js';
 import { fetchTokenData } from '../utils/dexApi.js';
 import { Markup } from 'telegraf';
+import { parseDexData } from '../utils/tokenParser.js';
+import { fmtUSD } from '../utils/formatters.js';
+
+// pending custom buy requests: userId -> mint
+const pendingCustomBuys = new Map();
 
 export default (bot) => {
   bot.command('buy', async (ctx) => {
@@ -42,7 +47,8 @@ export default (bot) => {
   });
 
   // Inline callback handlers for quick-buy buttons (callback_data format: buy:<mint>:<amount|custom>)
-  bot.action(/buy:.+/, async (ctx) => {
+  // anchor handler to avoid accidental matches
+  bot.action(/^buy:.+/, async (ctx) => {
     try {
       const data = ctx.callbackQuery && ctx.callbackQuery.data;
       if (!data) return ctx.answerCbQuery();
@@ -52,7 +58,9 @@ export default (bot) => {
       const amt = parts[2];
       if (!mint) return ctx.reply('Invalid mint in callback.');
       if (amt === 'custom') {
-        return ctx.reply(`To buy, reply with:\n/buy ${mint} <sol_amount>`);
+        // record pending buy and prompt the user to send amount
+        pendingCustomBuys.set(ctx.from.id, mint);
+        return ctx.reply(`Enter the amount of SOL to spend on this token (e.g. 0.5). To cancel, reply with 'cancel'.\nToken: ${mint}`);
       }
       const solAmount = parseFloat(amt);
       if (isNaN(solAmount) || solAmount <= 0) return ctx.reply('Invalid SOL amount.');
@@ -65,6 +73,39 @@ export default (bot) => {
       }
     } catch (err) {
       console.error('buy action error', err);
+    }
+  });
+
+  // Capture user's next text when they have a pending custom buy
+  // Use next to allow other handlers to run when we are not handling the message
+  bot.on('text', async (ctx, next) => {
+    try {
+      const userId = ctx.from && ctx.from.id;
+      if (!userId) return;
+      if (!pendingCustomBuys.has(userId)) return next(); // not waiting for custom amount
+      const mint = pendingCustomBuys.get(userId);
+      const text = (ctx.message && ctx.message.text) ? ctx.message.text.trim() : '';
+      if (!text) return;
+      if (text.toLowerCase() === 'cancel') {
+        pendingCustomBuys.delete(userId);
+        return ctx.reply('Custom buy cancelled.');
+      }
+      const solAmount = parseFloat(text);
+      if (isNaN(solAmount) || solAmount <= 0) {
+        return ctx.reply('Invalid SOL amount. Please send a number like 0.1 or 1. To cancel, reply with "cancel".');
+      }
+      // perform buy
+      try {
+        const res = await executeBuy(ctx.state.user, mint, solAmount);
+        await ctx.reply(res);
+      } catch (err) {
+        console.error('custom buy execute error', err);
+        await ctx.reply('Buy failed: ' + (err.message || 'unknown error'));
+      } finally {
+        pendingCustomBuys.delete(userId);
+      }
+    } catch (err) {
+      console.error('pending custom buy handler error', err);
     }
   });
 };
