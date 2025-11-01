@@ -330,10 +330,4 @@ pnpm start
 
 ---
 
-If you'd like, I can:
-- Add a short automated test that runs a simulated buy and prints pre/post balance for quick verification.
-- Add Postgres to the repo `docker-compose.yml` and provide a migration script to create the necessary tables.
-- Add README badges (Node, Redis, License).
-
----
-Developer contact: @realkazper
+Developer contact: https://t.me/realkazper
