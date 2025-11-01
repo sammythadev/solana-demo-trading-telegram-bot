@@ -6,7 +6,7 @@ import { GAS_USD } from '../config/constants.js';
 // Use wrapped SOL mint to fetch SOL/USD from Dexscreener
 const WSOL_MINT = 'So11111111111111111111111111111111111111112';
 
-async function getSolUsd() {
+export async function getSolUsd() {
   try {
     const data = await fetchTokenData(WSOL_MINT);
     // Dexscreener token response may include priceUsd or pairs[].priceUsd
