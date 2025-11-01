@@ -1,10 +1,3 @@
-Absolutely — here’s a **complete, production-ready README.md template** for your project, fully aligned with your PRD and folder structure.
-
-This version is written in a **GitHub-optimized format**, with clear headings, emojis, and tables so it’s clean, professional, and developer-friendly.
-
-You can copy-paste this directly into your project root as `README.md`.
-
----
 
 ```markdown
 # 💹 Telegram Solana Demo Trading Bot (Dexscreener + Adjustable Speed Edition)
