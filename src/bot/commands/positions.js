@@ -20,14 +20,16 @@ export default (bot) => {
           const valueUsd = amount * price;
           const costUsd = amount * (parseFloat(p.buy_price) || 0);
           const pnlUsd = valueUsd - costUsd;
-          const pnlPct = costUsd ? ((pnlUsd / costUsd) * 100).toFixed(2) : '0.00';
-          const pnlEmoji = pnlUsd >= 0 ? '📈' : '📉';
+          const rawPct = costUsd ? ((pnlUsd / costUsd) * 100) : 0;
+          const pnlPct = (rawPct >= 0 ? '+' : '') + rawPct.toFixed(2);
+          const pnlSign = pnlUsd >= 0 ? '+' : '-';
+          const pnlEmoji = pnlUsd >= 0 ? '�' : '�';
 
           const entry = `🪙 ${parsed.name || parsed.symbol || 'Unknown'} (${parsed.symbol || p.symbol || '—'})\n` +
             `🔢 Amount: ${amount}\n` +
             `💰 Price: $${fmtUSD(price)}\n` +
             `💵 Value: $${fmtUSD(valueUsd)}\n` +
-            `${pnlEmoji} PnL: ${pnlPct}% ($${fmtUSD(pnlUsd)})`;
+            `${pnlEmoji} PnL: ${pnlPct}% (${pnlSign}$${fmtUSD(Math.abs(pnlUsd))})`;
 
           lines.push(entry);
         } catch (err) {

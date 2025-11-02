@@ -5,10 +5,16 @@ import PositionModel from './models/Position.js';
 import TransactionModel from './models/Transaction.js';
 
 let sequelize;
+let cachedModels = null;
 
 export const initDB = async () => {
+  // Return cached instance if already initialized
+  if (sequelize && cachedModels) {
+    return { sequelize, models: cachedModels };
+  }
+
   sequelize = new Sequelize(DATABASE_URL, { logging: false });
-  // init models
+  // init models (create only once)
   const User = UserModel(sequelize, Sequelize.DataTypes);
   const Position = PositionModel(sequelize, Sequelize.DataTypes);
   const Transaction = TransactionModel(sequelize, Sequelize.DataTypes);
@@ -22,5 +28,7 @@ export const initDB = async () => {
   // Using plain sync avoids runtime ALTERs that may error when enum types differ.
   await sequelize.sync();
   console.log('Database synced');
-  return { sequelize, models: { User, Position, Transaction } };
+
+  cachedModels = { User, Position, Transaction };
+  return { sequelize, models: cachedModels };
 };

@@ -6,14 +6,22 @@ import { GAS_USD } from '../config/constants.js';
 // Use wrapped SOL mint to fetch SOL/USD from Dexscreener
 const WSOL_MINT = 'So11111111111111111111111111111111111111112';
 
+// simple in-memory cache for SOL price to avoid frequent API calls
+let solCache = { price: null, expires: 0 };
+const SOL_TTL_MS = 15 * 1000; // 15 seconds
+
 export async function getSolUsd() {
+  const now = Date.now();
+  if (solCache.price && solCache.expires > now) return solCache.price;
   try {
     const data = await fetchTokenData(WSOL_MINT);
-    // Dexscreener token response may include priceUsd or pairs[].priceUsd
     const price = data && (data.priceUsd || (data.pairs && data.pairs[0] && data.pairs[0].priceUsd));
     if (!price) throw new Error('SOL price not found in Dexscreener response');
     const n = parseFloat(price);
-    if (Number.isFinite(n) && n > 0) return n;
+    if (Number.isFinite(n) && n > 0) {
+      solCache = { price: n, expires: Date.now() + SOL_TTL_MS };
+      return n;
+    }
     throw new Error('Invalid SOL price from Dexscreener');
   } catch (err) {
     console.error('getSolUsd error:', err.message || err);
