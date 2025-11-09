@@ -18,6 +18,20 @@ Developer contact: https://t.me/realkazper
 
 ## Quick start (Windows / PowerShell)
 
+# Axel — Telegram Solana demo trading bot
+
+This repository contains a Telegram bot that simulates spot trading for Solana tokens. It uses live market data from Dexscreener and keeps users on a virtual SOL balance (no on-chain transactions).
+
+Highlights of recent changes (Nov 9, 2025)
+- Trades view is now paginated (10 trades per page) with Prev/Next, Refresh and Cancel controls.
+- Trades header shows total trades, total PnL (USD), estimated profit % and win/loss counts + win rate.
+- Portfolio now uses DB-level pagination (reduced memory & latency) and batch token fetches.
+- Buy and Sell UIs include inline quick-action buttons and an explicit ❌ Cancel button to dismiss the inline message.
+- Token fetching improved with a short in-memory LRU cache, Redis fallback, request coalescing and keep-alive HTTP connections.
+- DB connection pooling and a lightweight `pg` pool helper were added. `Sequelize` is configured with explicit pool settings.
+
+Quick start (Windows / PowerShell)
+
 1. Install dependencies:
 
 ```powershell
@@ -25,64 +39,62 @@ pnpm install
 # or npm install
 ```
 
-2. Create a `.env` file at the project root and set these variables at minimum:
+2. Create a `.env` file at the project root with at least:
 
 ```text
 BOT_TOKEN=your_telegram_bot_token
 REDIS_URL=redis://localhost:6379
-DATABASE_URL=postgres://user:pass@localhost:5432/axel_db   # optional
+DATABASE_URL=postgres://user:pass@localhost:5432/axel_db
 DEXSCREENER_BASE_URL=https://api.dexscreener.com/latest/dex/tokens
+NODE_ENV=development
 ```
 
-3. Start Redis (via Docker or locally):
+3. Start Redis and Postgres (local or docker-compose):
 
 ```powershell
+# start Redis (quick)
 docker run -d --name local-redis -p 6379:6379 redis:7
-# or docker-compose up -d (the repo includes a compose file)
+# or use docker-compose up -d
 ```
 
-4. Run the bot:
+4. Start the bot in dev mode:
 
 ```powershell
-pnpm run dev   # use nodemon for development
+pnpm run dev
 # or pnpm start
 ```
 
-5. Open the bot in Telegram and send `/start`.
-
----
-
-## Commands
-
+Commands (user-facing)
 - /start — register and seed a demo SOL balance
 - /help — list commands and developer contact
 - /token <mint> — show token details
-- /buy <mint> <sol> — simulate buy (quick buttons available)
-- /sell <mint|symbol> <percent> — simulate sell
+- /buy <mint> — show quick buy buttons (Buy 0.1/0.5/1, Custom, Cancel)
+- /buy <mint> <sol> — execute a simulated buy
+- /sell <mint|symbol> — show quick sell buttons (25/50/75/100, Custom, Cancel)
+- /sell <mint|symbol> <percent> — execute a simulated sell
 - /portfolio — paginated positions (5 per page)
 - /positions — compact positions list
-- /trades [all|buys|sells] — transaction history (defaults to sold trades)
+- /trades [sold|buys|all] — transaction history (paginated, 10 per page)
 - /balance — show SOL and USD estimate
 - /topup <amount> — add demo SOL
 - /settings — choose execution speed mode
 
+Operational notes & tuning
+- Token price and metadata are cached in-process (LRU) and in Redis with short TTLs to reduce Dexscreener requests.
+- Dex API calls use an HTTP agent with keepAlive and a bounded concurrency limiter to reduce latency and avoid spikes.
+- Sequelize is configured with explicit pool settings (see `src/config/database.js`). There's also a lightweight `pg` pool helper in `src/db/pgPool.js` for fast raw queries.
+- Redis: configure `maxmemory` & `maxmemory-policy` (e.g. `volatile-lru`) in production to avoid OOM and enable predictable eviction.
+
+Development notes
+- The codebase uses ES modules. If you add native dependencies, ensure ESM compatibility.
+- For production, avoid relying on `sequelize.sync()` for migrations; use proper migrations instead.
+
+Where to start improving performance further
+- Add Prometheus metrics for pg pool counts, Redis hit/miss, and external API latencies.
+- Cache final rendered portfolio pages (short TTL) and serve stale-while-revalidate.
+- Move the hottest read paths to `pgPool.query()` for lower ORM overhead.
+
+Developer
+- Contact: @realkazper (Telegram)
+
 ---
-
-## Notes
-
-- Live prices come from Dexscreener. The app caches token data in Redis and uses short in-memory caches to improve responsiveness.
-- Gas amounts are configured in `src/config/constants.js` and converted to SOL at runtime. The UI does not display gas values; they are deducted automatically.
-- The app uses Sequelize for persistence. For production, use proper migrations instead of runtime `sync({ alter: true })`.
-
----
-
-## Project layout (important files)
-
-- `src/bot/` — Telegram commands and middleware
-- `src/services/` — trade logic, portfolio and balance services
-- `src/db/` — Sequelize models and DB init
-- `src/cache/redisClient.js` — Redis helpers
-- `src/bot/utils/` — Dexscreener helpers and formatters
-
----
-

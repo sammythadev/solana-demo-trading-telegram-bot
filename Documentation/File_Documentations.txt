@@ -50,6 +50,63 @@ Axel-Solana-Demo-Trading-Bot/
 │   ├── utils/
 │   │   └── logger.js
 │   │
+```plaintext
+file & folder tree
+
+Axel-Solana-Demo-Trading-Bot/
+│
+├── src/
+│   ├── bot/
+│   │   ├── commands/
+│   │   │   ├── start.js
+│   │   │   ├── token.js
+│   │   │   ├── buy.js
+│   │   │   ├── sell.js
+│   │   │   ├── portfolio.js
+│   │   │   ├── positions.js
+│   │   │   ├── balance.js
+│   │   │   ├── trades.js
+│   │   │   ├── topup.js
+│   │   │   ├── settings.js
+│   │   │   └── help.js
+│   │   ├── middlewares/
+│   │   │   └── userMiddleware.js
+│   │   ├── utils/
+│   │   │   ├── formatters.js
+│   │   │   ├── speedDelay.js
+│   │   │   ├── dexApi.js
+│   │   │   └── tokenCache.js
+│   │   ├── bot.js
+│   │   └── index.js
+│   │
+│   ├── db/
+│   │   ├── models/
+│   │   │   ├── User.js
+│   │   │   ├── Position.js
+│   │   │   └── Transaction.js
+│   │   ├── migrations/
+│   │   │   └── (use migrations in production; not auto-run in prod)
+│   │   ├── index.js
+│   │   └── pgPool.js
+│   │
+│   ├── cache/
+│   │   └── redisClient.js
+│   │
+│   ├── config/
+│   │   ├── database.js
+│   │   ├── redis.js
+│   │   ├── env.js
+│   │   └── constants.js
+│   │
+│   ├── services/
+│   │   ├── tradeService.js
+│   │   ├── portfolioService.js
+│   │   ├── balanceService.js
+│   │   └── userService.js
+│   │
+│   ├── utils/
+│   │   └── logger.js
+│   │
 │   └── index.js
 │
 ├── .env
@@ -64,17 +121,17 @@ File	              Description
 -----------------------------------------------------------------------
 package.json	      Node.js manifest file. Declares project metadata, dependencies, and scripts.
 .env	              Environment variables — keeps secrets like BOT_TOKEN, DATABASE_URL, REDIS_URL.
-.gitignore         	  Specifies which files/folders Git should ignore (e.g., node_modules, .env).
-README.md	          High-level documentation — quick start guide, features, and setup instructions.
-docker-compose.yml	  Defines services (bot, PostgreSQL, Redis) for local or production deployment.
-/src/	              The heart of the bot — contains all source code.
+.gitignore          	  Specifies files/folders Git should ignore (e.g., node_modules, .env).
+README.md	          High-level documentation — quick start, features, and setup instructions.
+docker-compose.yml	  Defines services (bot, PostgreSQL, Redis) for local or development deployment.
+/src/ 	              Application source code.
 
 
 -------------------------------------------------------------------------------------------------------------
 
 📂 /src — Main Application Directory
 
-The src/ directory contains all app logic — bot commands, database layer, caching, services, and utilities.
+The src/ directory contains all application logic — bot commands, database layer, caching, services, and utilities.
 
 src/
 │
@@ -89,7 +146,7 @@ src/
 
 🤖 /src/bot — Telegram Bot Logic
 
-Handles everything related to Telegram: commands, message handling, and user interactions.
+Handles Telegram interactions: commands, middleware, and inline callback handlers.
 src/bot/
 │
 ├── commands/
@@ -101,38 +158,46 @@ src/bot/
 🧩 Files & Folder
 | Path             | Description                                                                |
 | ---------------- | -------------------------------------------------------------------------- |
-| **bot.js**       | Initializes Telegraf, sets up command handlers, and attaches middleware.   |
-| **index.js**     | Entry point for the bot — imports all commands and starts polling.         |
-| **commands/**    | Contains one JS file per Telegram command (modular command structure).     |
-| **middlewares/** | Custom middleware (e.g. user registration check).                          |
-| **utils/**       | Helper functions specific to bot features (API calls, formatters, delays). |
+| **bot.js**       | Instantiates Telegraf, registers command and action handlers, and configures polling options.   |
+| **index.js**     | Starts the bot service (calls bot.launch) and wires graceful shutdown.      |
+| **commands/**    | One module per Telegram command (start, buy, sell, portfolio, trades, etc.). |
+| **middlewares/** | Middleware (user registration, auth) executed before command handlers.     |
+| **utils/**       | Helper modules for API calls, caching, and message formatting.             |
 
 ---------------------------------------------------------------------------------------------------------
 
-📁 /src/bot/commands
+📁 /src/bot/commands (overview)
 
-Each command the user can call in Telegram is a separate file.
-This modular design makes it easy to maintain or add new commands.
+Each command file implements a specific Telegram command and any related inline action handlers.
 
-| File             | Command                  | Purpose                                                                  |
-| ---------------- | ------------------------ | ------------------------------------------------------------------------ |
-| **start.js**     | `/start`                 | Registers a new user in the DB, sets default SOL balance and speed mode. |
-| **token.js**     | `/token <mint>`          | Fetches token data from Dexscreener and returns market details.          |
-| **buy.js**       | `/buy <mint> <sol>`      | Simulates a buy order, deducts SOL, records position.                    |
-| **sell.js**      | `/sell <mint> <percent>` | Simulates a sell order, calculates profit/loss, updates position.        |
-| **portfolio.js** | `/portfolio`             | Shows open positions, real-time PnL and portfolio value.                 |
-| **balance.js**   | `/balance`               | Displays current virtual SOL balance and USD equivalent.                 |
-| **topup.js**     | `/topup <amount>`        | Adds demo SOL to the user’s balance.                                     |
-| **settings.js**  | `/settings`              | Lets the user change execution speed (Turbo, Fast, Normal, Slow).        |
-| **help.js**      | `/help`                  | Lists available commands with short descriptions.                        |
+| File             | Command (or action)        | Purpose / Notes                                                          |
+| ---------------- | -------------------------- | ------------------------------------------------------------------------ |
+| **start.js**     | `/start`                   | Register user, seed demo SOL balance, show welcome message.             |
+| **token.js**     | `/token <mint>`            | Show token details from Dexscreener (price, liquidity, FDV).            |
+| **buy.js**       | `/buy <mint>`              | Show quick buy inline buttons (0.1/0.5/1, Custom, Cancel).              |
+|                  | `/buy <mint> <sol>`        | Execute buy. Custom option collects amount via follow-up message.       |
+| **sell.js**      | `/sell <mint|symbol>`      | Show quick sell inline buttons (25/50/75/100, Custom, Cancel).          |
+|                  | `/sell <mint|symbol> <pct>`| Execute sell of percent of position.                                    |
+| **portfolio.js** | `/portfolio`               | Paginated positions (5 per page), fetches token metadata in batches.    |
+| **positions.js** | `/positions`               | Compact list of positions (symbol — amount — $value — PnL%).            |
+| **trades.js**    | `/trades [sold|buys|all]`  | Paginated trades view (10 per page). Shows total trades, PnL, win/loss stats. |
+| **balance.js**   | `/balance`                 | Shows SOL balance and estimated USD value (uses getSolUsd).             |
+| **topup.js**     | `/topup <amount>`          | Add demo SOL to the user's account (transaction recorded).              |
+| **settings.js**  | `/settings`                | Configure execution speed (Turbo/Fast/Normal/Slow) — affects gas deduction. |
+| **help.js**      | `/help`                    | Lists commands and developer contact.                                   |
 
+Inline callback data patterns
+- `buy:<mint>:<amount|custom|cancel>` — quick buy actions and cancel
+- `sell:<mint>:<percent|custom|cancel>` — quick sell actions and cancel
+- `portfolio:page:<n>` / `portfolio:refresh:<n>` / `portfolio:cancel:<n>` — portfolio controls
+- `trades:page:<filter>:<n>` / `trades:refresh:<filter>` / `trades:cancel` — trades controls
 
 -----------------------------------------------------------------------------------------------------------------------------------
 
 📁 /src/bot/middlewares
 | File                  | Purpose                                                                                    |
 | --------------------- | ------------------------------------------------------------------------------------------ |
-| **userMiddleware.js** | Ensures every message comes from a registered user; auto-registers on first use if needed. |
+| **userMiddleware.js** | Ensures requests are tied to a registered user; populates `ctx.state.user`.               |
 
 ----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -140,16 +205,16 @@ This modular design makes it easy to maintain or add new commands.
 
 | File              | Purpose                                                                        |
 | ----------------- | ------------------------------------------------------------------------------ |
-| **dexApi.js**     | Handles calls to the Dexscreener API and caches responses in Redis for 30–60s. |
-| **formatters.js** | Functions to format numbers, currency, and message templates with emojis.      |
-| **speedDelay.js** | Implements execution delay logic for Turbo / Fast / Normal / Slow modes.       |
+| **dexApi.js**     | Dexscreener integration with: keep-alive HTTP agent, concurrency limiter, in-process cache and Redis backing. |
+| **tokenCache.js** | LRU-backed in-process cache with in-flight dedupe, batching and Redis persistence. |
+| **formatters.js** | Message and currency formatting helpers (fmtUSD, percent, PnL emoji).          |
+| **speedDelay.js** | Implements execution delays per speed mode (affects simulated slippage/gas).    |
 
 ---------------------------------------------------------------------------------------------------------------
 
 🗃️ /src/db — Database Layer
 
-Manages all persistence (PostgreSQL).
-Organized by models, migrations, and connection setup.
+Manages persistence with Sequelize and provides a lightweight `pg.Pool` helper for raw queries.
 
 src/db/
 │
@@ -160,82 +225,58 @@ src/db/
 
 📁 /src/db/models
 
-Each model represents a database table using Sequelize ORM.
-
 | File               | Table          | Purpose                                                              |
 | ------------------ | -------------- | -------------------------------------------------------------------- |
 | **User.js**        | `users`        | Stores Telegram ID, virtual SOL balance, speed mode, timestamps.     |
-| **Position.js**    | `positions`    | Stores user’s open token positions (mint, price, amount, SOL spent). |
-| **Transaction.js** | `transactions` | Tracks every trade (buy/sell/topup) with PnL info.                   |
------------------------------------------------------------------------------------------------------------------------
+| **Position.js**    | `positions`    | Tracks open positions: token_address, symbol, buy_price, amount_tokens, sol_spent. |
+| **Transaction.js** | `transactions` | Records buys, sells, topups with pnl_usd, total_usd, created_at, type. |
 
-📁 /src/db/migrations
-| Purpose                                                                                               |
-| ----------------------------------------------------------------------------------------------------- |
-| Contains migration scripts auto-generated by Sequelize CLI. Used for creating and updating DB tables. |
+`src/db/index.js` — creates a single Sequelize instance with pooled connections and idempotent init.
+`src/db/pgPool.js` — exported `query` and `getClient` helpers using `pg.Pool` for fast raw SQL.
 
+---------------------------------------------------------------------------------------------------------------------------------
 
------------------------------------------------------------------------------------------------------------------
-
-/src/db/index.js
-| Purpose                                                                                         |
-| ----------------------------------------------------------------------------------------------- |
-| Initializes the Sequelize connection using `DATABASE_URL`. Loads models and syncs DB if needed. |
-
-
-------------------------------------------------------------------------------------------------------------
 ⚡ /src/cache — Redis Caching Layer
-
-src/cache/
-└── redisClient.js
-
 
 | File               | Purpose                                                                                |
 | ------------------ | -------------------------------------------------------------------------------------- |
-| **redisClient.js** | Configures Redis connection, provides helper methods for caching Dexscreener API data. |
+| **redisClient.js** | Manages Redis client lifecycle, provides `redisGet`, `redisSet`, and simple acquire/release lock helpers. |
+
+Key naming (examples)
+- `dex:{mint}` — raw Dexscreener response
+- `token:{mint}` — parsed token metadata cached in Redis
+- `portfolio:{userId}:page:{n}` — (recommended) cached rendered portfolio page snapshot
 
 -------------------------------------------------------------------------------------------------------------------
-⚙️ /src/config — Configuration Files
 
-src/config/
-│
-├── database.js
-├── redis.js
-├── env.js
-└── constants.js
+⚙️ /src/config — Configuration Files
 
 | File             | Purpose                                                                 |
 | ---------------- | ----------------------------------------------------------------------- |
-| **database.js**  | Exports PostgreSQL/Sequelize configuration.                             |
-| **redis.js**     | Redis connection setup (host, port, password).                          |
-| **env.js**       | Loads `.env` variables using dotenv; exports them app-wide.             |
-| **constants.js** | Stores static constants like speed delay presets, default balance, etc. |
+| **database.js**  | Exposes DATABASE_URL and DB_POOL defaults. Tune via env vars (DB_POOL_MAX etc.). |
+| **redis.js**     | Exposes REDIS_URL and other Redis-related env wiring.                   |
+| **env.js**       | Loads `.env` via dotenv and exports ENV for runtime configuration.      |
+| **constants.js** | Stores gas/fee constants, default balance, and speed presets.          |
 
 
 ------------------------------------------------------------------------------------------------------------
 
 💼 /src/services — Business Logic Layer
 
-src/services/
-├── tradeService.js
-├── portfolioService.js
-├── balanceService.js
-└── userService.js
-
 | File                    | Purpose                                                                     |
 | ----------------------- | --------------------------------------------------------------------------- |
-| **tradeService.js**     | Handles core buy/sell logic — validates inputs, applies delays, updates DB. |
-| **portfolioService.js** | Calculates current holdings, values, and PnL per user.                      |
-| **balanceService.js**   | Manages SOL balance retrieval and top-up functionality.                     |
-| **userService.js**      | Handles user registration, speed updates, and profile retrieval.            |
+| **tradeService.js**     | Executes buys/sells: validates, computes gas, updates positions & transactions, merges buys into existing positions. |
+| **portfolioService.js** | Aggregation helpers for portfolio values (used by portfolio command).       |
+| **balanceService.js**   | Computes SOL balance and USD estimate (uses getSolUsd).                     |
+| **userService.js**      | User profile updates (speed setting), registration helper.                  |
 
 -----------------------------------------------------------------------------------------------------------------
-🧰 /src/utils
 
+🧰 /src/utils
 
 | File          | Purpose                                                                                 |
 | ------------- | --------------------------------------------------------------------------------------- |
-| **logger.js** | Central logging utility using `console` or `winston` for debugging and production logs. |
+| **logger.js** | Central logging helper used across services and commands.                              |
 
 -----------------------------------------------------------------------------------------------------------------
 
@@ -243,7 +284,7 @@ src/services/
 
 | Purpose                                                                                                      |
 | ------------------------------------------------------------------------------------------------------------ |
-| Main entry point of the entire application. Initializes config, database, cache, and starts the bot service. |
+| Bootstraps environment, initializes DB and Redis, then starts the Telegraf bot.                              |
 
 -------------------------------------------------------------------------------------------------------------------------
 
@@ -251,5 +292,7 @@ src/services/
 
 | Purpose                                                                                |
 | -------------------------------------------------------------------------------------- |
-| Defines containerized services for development: PostgreSQL, Redis, and the Bot itself. |
-| Simplifies local setup — just `docker-compose up -d` to spin up all components.        |
+| Defines local development containers: Postgres, Redis, and an app service for the bot. |
+| Simplifies running the full stack locally (`docker-compose up -d`).                   |
+
+```

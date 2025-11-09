@@ -19,8 +19,18 @@ export default (bot) => {
         const data = await fetchTokenData(mint);
         if (!data) return ctx.reply('Token not found on Dexscreener.');
         const parsed = parseDexData(data);
-        const out = `🪙 ${parsed.name || parsed.symbol || 'Unknown'} (${parsed.symbol || '—'})\n💰 Price: $${fmtUSD(parsed.priceUsd)}\n💧 Liquidity: $${fmtUSD(parsed.liquidityUsd)}\n\nTo buy, reply with:\n/buy ${mint} <sol_amount>\n\nQuick options:\n/buy ${mint} 0.1\n/buy ${mint} 0.5\n/buy ${mint} 1`;
-        return ctx.reply(out);
+        const out = `🪙 ${parsed.name || parsed.symbol || 'Unknown'} (${parsed.symbol || '—'})\n` +
+          `💰 Price: $${fmtUSD(parsed.priceUsd)}\n` +
+          `💧 Liquidity: $${fmtUSD(parsed.liquidityUsd)}\n\n` +
+          `Choose a quick buy or use Custom:`;
+
+        const keyboard = Markup.inlineKeyboard([
+          [Markup.button.callback('Buy 0.1 SOL', `buy:${mint}:0.1`), Markup.button.callback('Buy 0.5 SOL', `buy:${mint}:0.5`)],
+          [Markup.button.callback('Buy 1 SOL', `buy:${mint}:1`), Markup.button.callback('Custom', `buy:${mint}:custom`)],
+          [Markup.button.callback('❌ Cancel', `buy:${mint}:cancel`)]
+        ]);
+
+        return ctx.reply(out, keyboard);
       } catch (err) {
         console.error('buy command (show) error', err);
         return ctx.reply('Error fetching token data.');
@@ -61,6 +71,17 @@ export default (bot) => {
         // record pending buy and prompt the user to send amount
         pendingCustomBuys.set(ctx.from.id, mint);
         return ctx.reply(`Enter the amount of SOL to spend on this token (e.g. 0.5). To cancel, reply with 'cancel'.\nToken: ${mint}`);
+      }
+      if (amt === 'cancel') {
+        try {
+          const callbackMsg = ctx.callbackQuery && ctx.callbackQuery.message;
+          const chatId = callbackMsg && callbackMsg.chat && callbackMsg.chat.id;
+          const msgId = callbackMsg && (callbackMsg.message_id || callbackMsg.messageId);
+          if (chatId && msgId) await ctx.deleteMessage(msgId);
+        } catch (e) {
+          // ignore
+        }
+        return ctx.answerCbQuery('Cancelled');
       }
       const solAmount = parseFloat(amt);
       if (isNaN(solAmount) || solAmount <= 0) return ctx.reply('Invalid SOL amount.');

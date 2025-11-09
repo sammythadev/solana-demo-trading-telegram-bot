@@ -44,7 +44,8 @@ export default (bot) => {
         const keyboard = Markup.inlineKeyboard([
           [Markup.button.callback('25%', `sell:${mint}:25`), Markup.button.callback('50%', `sell:${mint}:50`)],
           [Markup.button.callback('75%', `sell:${mint}:75`), Markup.button.callback('100%', `sell:${mint}:100`)],
-          [Markup.button.callback('Custom', `sell:${mint}:custom`)]
+          [Markup.button.callback('Custom', `sell:${mint}:custom`)],
+          [Markup.button.callback('❌ Cancel', `sell:${mint}:cancel`)]
         ]);
 
         return ctx.reply(out, keyboard);
@@ -88,6 +89,17 @@ export default (bot) => {
       if (!mint) return ctx.reply('Invalid mint in callback.');
       if (amt === 'custom') {
         return ctx.reply(`To sell, reply with:\n/sell ${mint} <percent>`);
+      }
+      if (amt === 'cancel') {
+        try {
+          const callbackMsg = ctx.callbackQuery && ctx.callbackQuery.message;
+          const chatId = callbackMsg && callbackMsg.chat && callbackMsg.chat.id;
+          const msgId = callbackMsg && (callbackMsg.message_id || callbackMsg.messageId);
+          if (chatId && msgId) await ctx.deleteMessage(msgId);
+        } catch (e) {
+          // ignore
+        }
+        return ctx.answerCbQuery('Cancelled');
       }
       const percent = parseFloat(amt);
       if (isNaN(percent) || percent <= 0 || percent > 100) return ctx.reply('Percent must be 1-100.');
