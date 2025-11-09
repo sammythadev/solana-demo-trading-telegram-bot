@@ -5,6 +5,8 @@ let client;
 export const initRedis = async () => {
   if (client) return client;
   client = createClient({ url: REDIS_URL });
+  // Surface runtime errors but don't crash the process here; callers should
+  // handle Redis failures gracefully.
   client.on('error', (err) => console.error('Redis error', err));
   await client.connect();
   console.log('Redis connected');
@@ -13,8 +15,7 @@ export const initRedis = async () => {
 
 export const redisGet = async (key) => {
   if (!client) await initRedis();
-  const v = await client.get(key);
-  return v;
+  return client.get(key);
 };
 
 export const redisSet = async (key, value, ttl = 60) => {
@@ -22,20 +23,19 @@ export const redisSet = async (key, value, ttl = 60) => {
   await client.set(key, value, { EX: ttl });
 };
 
-// Acquire a simple Redis lock with a token. Returns token string when acquired, or null.
+// Simple Redis-backed lock: set key to a random token with NX and PX. Returns
+// the token when acquired; caller must pass token to releaseLock.
 export const acquireLock = async (key, ttl = 30000) => {
   if (!client) await initRedis();
   const token = Math.random().toString(36).slice(2);
-  // SET key token NX PX ttl
   const res = await client.set(key, token, { NX: true, PX: ttl });
   if (res === 'OK') return token;
   return null;
 };
 
-// Release lock only if token matches (safe unlock)
+// Release the lock only if the token matches using a Lua script for atomicity.
 export const releaseLock = async (key, token) => {
   if (!client) await initRedis();
-  // Use Lua script for atomic check-and-del
   const script = `
     if redis.call('get', KEYS[1]) == ARGV[1] then
       return redis.call('del', KEYS[1])

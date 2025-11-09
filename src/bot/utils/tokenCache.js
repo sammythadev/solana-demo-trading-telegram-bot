@@ -1,22 +1,26 @@
-import LRU from 'lru-cache';
+import { LRUCache } from 'lru-cache';
 import { fetchTokenData } from './dexApi.js';
 import { redisGet, redisSet } from '../../cache/redisClient.js';
 
-// LRU cache for token data with 5 minute max age
-const tokenCache = new LRU({
-    max: 500, // Store max 500 tokens
-    ttl: 1000 * 60 * 5, // 5 minutes
+// In-process LRU to cap memory and keep recently-used token entries.
+// Tune `max` to control process memory footprint. TTL is configurable here
+// for a safe default (5 minutes for metadata; prices are refreshed elsewhere).
+const tokenCache = new LRUCache({
+    max: 500,
+    ttl: 1000 * 60 * 5,
     updateAgeOnGet: true
 });
 
-// In-flight request tracking to prevent duplicate fetches
+// Track promises for tokens currently being fetched so we coalesce
+// duplicate requests (in-flight deduplication).
 const inFlightRequests = new Map();
 
-// Prefetch queue for background updates
+// Lightweight prefetch queue processed in small batches to warm cache
+// without blocking request handlers.
 const prefetchQueue = new Set();
 let prefetchTimer = null;
 
-// Batch size for parallel fetches
+// Maximum parallel fetches per batch to avoid spiking external API usage.
 const BATCH_SIZE = 10;
 
 /**

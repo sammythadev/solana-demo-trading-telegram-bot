@@ -1,5 +1,5 @@
 import { initDB } from '../../db/index.js';
-import { fetchTokenData } from '../utils/dexApi.js';
+import { fetchTokensBatch } from '../utils/tokenCache.js';
 import { parseDexData } from '../utils/tokenParser.js';
 import { fmtUSD } from '../utils/formatters.js';
 import { Markup } from 'telegraf';
@@ -15,24 +15,30 @@ const redisLockKey = (chatId, messageId) => `lock:portfolio:${chatId}:${messageI
 
 async function buildPage(user, page) {
   const { models } = await initDB();
-  const positions = await models.Position.findAll({ where: { user_id: user.id } });
+  // Use DB-level pagination so we don't load all positions into memory.
+  const offset = Math.max(0, page) * PAGE_SIZE;
+  const { count, rows: positions } = await models.Position.findAndCountAll({
+    where: { user_id: user.id },
+    attributes: ['token_address', 'symbol', 'buy_price', 'amount_tokens', 'sol_spent'],
+    limit: PAGE_SIZE,
+    offset,
+    order: [['id', 'ASC']]
+  });
+
   if (!positions || positions.length === 0) return { text: 'No open positions.', keyboard: null };
 
-  const totalPages = Math.max(1, Math.ceil(positions.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
   const p = Math.max(0, Math.min(page, totalPages - 1));
-  const start = p * PAGE_SIZE;
-  const slice = positions.slice(start, start + PAGE_SIZE);
 
   const lines = [];
   const buttons = [];
 
-  // Fetch token data in parallel for the page slice to reduce waiting on network
-  const fetches = slice.map((pos) => fetchTokenData(pos.token_address).then((d) => ({ pos, data: d })).catch((err) => ({ pos, data: null })));
-  const results = await Promise.all(fetches);
+  // Batch-fetch token metadata/prices for the page's token addresses.
+  const mints = positions.map((pos) => pos.token_address).filter(Boolean);
+  const tokenMap = await fetchTokensBatch(mints); // Map<mint, data>
 
-  for (const item of results) {
-    const pos = item.pos;
-    const data = item.data;
+  for (const pos of positions) {
+    const data = tokenMap.get(pos.token_address) || null;
     if (!data) {
       lines.push(`🪙 ${pos.symbol || 'TKN'}\nPrice unavailable\nAmount: ${pos.amount_tokens}`);
       buttons.push([Markup.button.callback(`Sell ${pos.symbol || ''}`, `portfolio:sell:${pos.token_address}`)]);
